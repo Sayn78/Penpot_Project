@@ -1,3 +1,6 @@
+> **Note :** Ce repository est un miroir du projet original hébergé sur GitLab (privé).  
+> L'infrastructure CI/CD et les pipelines restent sur GitLab.
+
 # Penpot GCP Deployment
 
 Infra GCP Penpot (front/back) via Terraform. Deux environnements (staging/prod), domaine `pen-pot.com`, DNS géré manuellement (registrar ou Cloud DNS en console). Les services managés (Cloud SQL, MemoryStore, GCS) sont utilisés pour la prod/staging ; les conteneurs Docker locaux ne servent qu’aux tests.
