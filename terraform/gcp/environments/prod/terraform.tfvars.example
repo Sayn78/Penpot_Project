@@ -1,0 +1,87 @@
+project_id   = "<YOUR_PROD_PROJECT_ID>"
+region       = "europe-west9"
+network_name = "penpot-prod"
+
+subnet_private_name                  = "penpot-private"
+subnet_private_cidr                  = "10.20.0.0/20"
+subnet_private_private_google_access = false
+
+subnet_public_name                  = "penpot-public"
+subnet_public_cidr                  = "10.20.32.0/24"
+subnet_public_private_google_access = false
+
+subnet_db_name = "penpot-db"
+subnet_db_cidr = "10.20.16.0/24"
+
+ssh_allowed_cidrs = [
+  "<YOUR_OFFICE_IP_CIDR/32>",
+]
+
+# core IP remote state (prod)
+core_ip_bucket  = "penpot-prod"
+core_ip_prefix  = "terraform/state/ip"
+use_staging_ips = false
+
+# Swarm manager (public)
+manager_zone         = "europe-west9-b"
+manager_machine_type = "e2-standard-2"
+manager_disk_size_gb = 50
+manager_image        = "projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64"
+# manager_service_account_email = "<optional-sa>@<project>.iam.gserviceaccount.com"
+
+# Workers (private) - worker1, worker2
+worker_machine_type = "e2-standard-4"
+worker_disk_size_gb = 160
+worker_image        = "projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64"
+workers = [
+  {
+    name                  = "penpot-worker1"
+    zone                  = "europe-west9-b"
+    service_account_email = ""
+  },
+  {
+    name                  = "penpot-worker2"
+    zone                  = "europe-west9-b"
+    service_account_email = ""
+  }
+]
+
+# Redis (prod)
+redis_name           = "penpot-redis"
+redis_tier           = "STANDARD_HA"
+redis_memory_size_gb = 2
+redis_labels         = {}
+
+# Bastion (prod)
+bastion_zone         = "europe-west9-b"
+bastion_machine_type = "e2-small"
+bastion_disk_size_gb = 20
+bastion_image        = "projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64"
+# bastion_service_account_email = "<optional-sa>@<project>.iam.gserviceaccount.com"
+
+# Monitoring (prod)
+monitoring_zone                 = "europe-west9-b"
+monitoring_machine_type         = "e2-medium"
+monitoring_disk_size_gb         = 50
+monitoring_image                = "projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64"
+# monitoring_service_account_email = "<optional-sa>@<project>.iam.gserviceaccount.com"
+
+# Cloud SQL (prod)
+cloudsql_instance_name     = "penpot-sql"
+cloudsql_database_version  = "POSTGRES_15"
+cloudsql_tier              = "db-custom-4-16384"
+cloudsql_disk_size_gb      = 100
+cloudsql_availability_type = "REGIONAL"
+cloudsql_username          = "penpot_app"
+cloudsql_password          = "<SET_IN_CI_OR_LOCALLY>"
+
+# Assets bucket (S3 AWS)
+assets_bucket_name          = "penpot-assets-prod"
+assets_bucket_versioning    = true
+assets_bucket_labels        = {}
+assets_bucket_force_destroy = true
+aws_region                  = "eu-west-3"
+
+# NAT
+nat_router_name = "penpot-prod-router"
+nat_name        = "penpot-prod-nat"

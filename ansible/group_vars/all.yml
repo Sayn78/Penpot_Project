@@ -1,0 +1,7 @@
+---
+# Récupère automatiquement le POSIX username OS Login du compte gcloud courant.
+# OS Login peut renvoyer plusieurs entrées séparées par ';' -> on prend la première et on supprime les quotes/espaces.
+ansible_user: "{{ lookup('pipe', \"gcloud compute os-login describe-profile --format='value(posixAccounts.username)' | head -n1 | cut -d';' -f1\") | trim }}"
+
+# Optionnel : décommente si tu veux forcer une clé spécifique (sinon ssh-agent suffit)
+# ansible_ssh_private_key_file: ~/.ssh/id_ed25519

@@ -1,0 +1,118 @@
+---
+- name: Deploy Monitoring Stack via Docker Compose
+  hosts: "monitoring-{{ env | default('staging') }}"
+  become: true
+
+  vars:
+    monitoring_dir: /opt/monitoring
+    prometheus_targets:
+      - 'penpot-{{ env | default("staging") }}-manager:9100'   # Manager
+      - 'penpot-{{ env | default("staging") }}-worker1:9100'   # Worker1
+      - 'penpot-{{ env | default("staging") }}-worker2:9100'   # Worker2
+
+  pre_tasks:
+    - name: Créer le répertoire monitoring
+      file:
+        path: "{{ monitoring_dir }}"
+        state: directory
+        mode: '0755'
+      tags: always
+
+  tasks:
+    # Copier les fichiers
+    - name: Copier docker-compose.yml
+      template:
+        src: ../monitoring-stack/docker-compose.yml.j2
+        dest: "{{ monitoring_dir }}/docker-compose.yml"
+        mode: '0644'
+      tags: deploy
+
+    - name: Créer les dossiers de configuration
+      file:
+        path: "{{ monitoring_dir }}/{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - prometheus/config
+        - loki/config
+        - grafana/provisioning/datasources
+        - grafana/provisioning/dashboards
+        - grafana/provisioning/alerting
+
+      tags: deploy
+
+    - name: Copier tous les fichiers de configuration statiques
+      copy:
+        src: ../monitoring-stack/
+        dest: "{{ monitoring_dir }}/"
+      tags: deploy
+
+    - name: Rendre le fichier .env depuis les secrets
+      template:
+        src: ../templates/grafana.env.j2
+        dest: "{{ monitoring_dir }}/.env"
+        owner: root
+        group: root
+        mode: "0600"
+      no_log: true
+
+    - name: Copier la configuration Prometheus
+      template:
+        src: ../monitoring-stack/prometheus/config/prometheus.yml.j2
+        dest: "{{ monitoring_dir }}/prometheus/config/prometheus.yml"
+        mode: '0644'
+      tags: deploy
+
+    - name: Démarrer la stack monitoring
+      command: docker compose up -d
+      args:
+        chdir: "{{ monitoring_dir }}"
+      tags: deploy
+
+    - name: Redemarrer la stack monitoring
+      command: docker compose restart
+      args:
+        chdir: "{{ monitoring_dir }}"
+      tags: deploy
+
+    - name: Attendre que les services soient prêts
+      wait_for:
+        port: "{{ item }}"
+        timeout: 60
+      loop:
+        - 9090  # Prometheus
+        - 3100  # Loki
+      tags: verify
+
+  post_tasks:
+    - name: Vérifier Prometheus
+      uri:
+        url: http://localhost:9090/-/healthy
+        method: GET
+        status_code: 200
+      register: prometheus_check
+      until: prometheus_check.status == 200
+      retries: 5
+      delay: 3
+      tags: verify
+
+    - name: Vérifier Loki
+      uri:
+        url: http://localhost:3100/ready
+        method: GET
+        status_code: 200
+      register: loki_check
+      until: loki_check.status == 200
+      retries: 5
+      delay: 3
+      tags: verify
+
+    - name: Attendre que Grafana soit prêt
+      uri:
+        url: "https://{{ grafana_domain }}/login"
+        status_code: 200
+        validate_certs: no
+      register: grafana_ready
+      retries: 30
+      delay: 2
+      until: grafana_ready.status == 200

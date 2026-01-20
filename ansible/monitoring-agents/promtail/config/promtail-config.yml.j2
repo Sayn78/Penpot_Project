@@ -1,0 +1,87 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /positions/positions.yaml
+
+clients:
+  # Adapter l'URL selon ton monitoring
+  - url: http://penpot-{{ env | default("staging") }}-monitoring:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: docker-penpot
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    
+    relabel_configs:
+      # Container name
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/?(.*)'
+        target_label: 'container_name'
+      
+      # Service name (ex: penpot_penpot-backend)
+      - source_labels: ['__meta_docker_container_label_com_docker_swarm_service_name']
+        regex: '(.+)'
+        target_label: 'service_name'
+      
+      # Task name (ex: penpot_penpot-backend.1.xyz)
+      - source_labels: ['__meta_docker_container_label_com_docker_swarm_task_name']
+        regex: '(.+)'
+        target_label: 'task_name'
+      
+      # Stack (ex: penpot)
+      - source_labels: ['__meta_docker_container_label_com_docker_stack_namespace']
+        regex: '(.+)'
+        target_label: 'stack'
+      
+      # Container ID court
+      - source_labels: ['__meta_docker_container_id']
+        regex: '(.{12})'
+        target_label: 'container_id'
+      
+      # Image
+      - source_labels: ['__meta_docker_container_image']
+        target_label: 'image'
+      
+      # Hostname de la VM
+      - replacement: '${HOSTNAME}'
+        target_label: 'hostname'
+      
+      # Environment
+      - replacement: '{{ env | default("staging") }}'
+        target_label: 'environment'
+      
+      # Job
+      - replacement: 'docker-penpot'
+        target_label: 'job'
+
+    pipeline_stages:
+      # Parse JSON
+      - json:
+          expressions:
+            level: level
+            timestamp: timestamp
+            message: message
+            logger: logger
+      
+      # Extraire le niveau de log
+      - regex:
+          expression: '(?P<level>ERROR|WARN|INFO|DEBUG|TRACE)'
+      
+      # Label level
+      - labels:
+          level:
+      
+      # Timestamp
+      - timestamp:
+          source: timestamp
+          format: RFC3339Nano
+          fallback_formats:
+            - "2006-01-02T15:04:05.999999999Z07:00"
+            - "2006-01-02T15:04:05Z07:00"
+      
+      # Output
+      - output:
+          source: message

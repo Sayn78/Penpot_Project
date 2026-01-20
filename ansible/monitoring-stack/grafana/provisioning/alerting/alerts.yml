@@ -1,0 +1,384 @@
+apiVersion: 1
+groups:
+    - orgId: 1
+      name: VM prod status
+      folder: alertes
+      interval: 1m
+      rules:
+        - uid: ff7heb6t72hhca
+          title: VM prod Manager status
+          condition: C
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: PBFA97CFB590B2093
+              model:
+                disableTextWrap: false
+                editorMode: builder
+                expr: up{node_name="manager", environment="prod"}
+                fullMetaSearch: false
+                includeNullMetadata: true
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+                useBackend: false
+            - refId: C
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 0
+                        type: eq
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - C
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: C
+                type: threshold
+          dashboardUid: penpot-infrastructurev2
+          panelId: 1
+          noDataState: OK
+          execErrState: Error
+          for: 1m
+          annotations:
+            __dashboardUid__: penpot-infrastructurev2
+            __panelId__: "1"
+            description: Le manager node en environnement prod ne répond plus. Vérifiez l'état de la VM.
+            summary: L'instance du manager node est down !!!
+          isPaused: false
+          notification_settings:
+            receiver: grafana-default-email
+        - uid: ef7hegzdlcutcf
+          title: VM prod Worker 1 status
+          condition: C
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: PBFA97CFB590B2093
+              model:
+                disableTextWrap: false
+                editorMode: builder
+                expr: up{node_name="worker1", environment="prod"}
+                fullMetaSearch: false
+                includeNullMetadata: true
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+                useBackend: false
+            - refId: C
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 0
+                        type: eq
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - C
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: C
+                type: threshold
+          dashboardUid: penpot-infrastructurev2
+          panelId: 2
+          noDataState: OK
+          execErrState: Error
+          for: 1m
+          annotations:
+            __dashboardUid__: penpot-infrastructurev2
+            __panelId__: "2"
+            description: Le worker node 1 en environnement prod ne répond plus. Impact possible sur la capacité de traitement.
+            summary: L'instance du worker node 1 est down !!!
+          isPaused: false
+          notification_settings:
+            receiver: grafana-default-email
+        - uid: df7hekts8bda8c
+          title: VM prod Worker 2 status
+          condition: C
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: PBFA97CFB590B2093
+              model:
+                disableTextWrap: false
+                editorMode: builder
+                expr: up{node_name="worker2", environment="prod"}
+                fullMetaSearch: false
+                includeNullMetadata: true
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+                useBackend: false
+            - refId: C
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 0
+                        type: eq
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - C
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: C
+                type: threshold
+          dashboardUid: penpot-infrastructurev2
+          panelId: 3
+          noDataState: OK
+          execErrState: Error
+          for: 1m
+          annotations:
+            __dashboardUid__: penpot-infrastructurev2
+            __panelId__: "3"
+            description: Le worker node 2 en environnement prod ne répond plus. Impact possible sur la capacité de traitement.
+            summary: L'instance du worker node 2 est down !!!
+          isPaused: false
+          notification_settings:
+            receiver: grafana-default-email
+    - orgId: 1
+      name: VM staging status
+      folder: alertes
+      interval: 1m
+      rules:
+        - uid: cf76nxjn4tl34a
+          title: VM staging Manager status
+          condition: C
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: PBFA97CFB590B2093
+              model:
+                disableTextWrap: false
+                editorMode: builder
+                expr: up{node_name="manager", environment="staging"}
+                fullMetaSearch: false
+                includeNullMetadata: true
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+                useBackend: false
+            - refId: C
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 0
+                        type: eq
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - C
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: C
+                type: threshold
+          dashboardUid: penpot-infrastructurev2
+          panelId: 1
+          noDataState: OK
+          execErrState: Error
+          for: 2m
+          annotations:
+            __dashboardUid__: penpot-infrastructurev2
+            __panelId__: "1"
+            description: Le manager node en environnement staging ne répond plus. Vérifiez l'état de la VM.
+            summary: L'instance du manager node est down !!!
+          labels:
+            environment: staging
+            node_type: manager
+            severity: critical
+          isPaused: false
+          notification_settings:
+            receiver: grafana-default-email
+        - uid: df76o2d2d1dkwe
+          title: VM staging Worker 1 status
+          condition: C
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: PBFA97CFB590B2093
+              model:
+                disableTextWrap: false
+                editorMode: builder
+                expr: up{node_name="worker1", environment="staging"}
+                fullMetaSearch: false
+                includeNullMetadata: true
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+                useBackend: false
+            - refId: C
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 0
+                        type: eq
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - C
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: C
+                type: threshold
+          dashboardUid: penpot-infrastructurev2
+          panelId: 2
+          noDataState: OK
+          execErrState: Error
+          for: 2m
+          annotations:
+            __dashboardUid__: penpot-infrastructurev2
+            __panelId__: "2"
+            description: Le worker node 1 en environnement staging ne répond plus. Impact possible sur la capacité de traitement.
+            summary: L'instance du worker node 1 est down !!!
+          labels:
+            environment: staging
+            node_type: worker
+            severity: warning
+          isPaused: false
+          notification_settings:
+            receiver: grafana-default-email
+        - uid: ef76o5i5t1b7kf
+          title: VM staging Worker 2 status
+          condition: C
+          data:
+            - refId: A
+              relativeTimeRange:
+                from: 600
+                to: 0
+              datasourceUid: PBFA97CFB590B2093
+              model:
+                disableTextWrap: false
+                editorMode: builder
+                expr: up{node_name="worker2", environment="staging"}
+                fullMetaSearch: false
+                includeNullMetadata: true
+                instant: true
+                intervalMs: 1000
+                legendFormat: __auto
+                maxDataPoints: 43200
+                range: false
+                refId: A
+                useBackend: false
+            - refId: C
+              datasourceUid: __expr__
+              model:
+                conditions:
+                    - evaluator:
+                        params:
+                            - 0
+                        type: eq
+                      operator:
+                        type: and
+                      query:
+                        params:
+                            - C
+                      reducer:
+                        params: []
+                        type: last
+                      type: query
+                datasource:
+                    type: __expr__
+                    uid: __expr__
+                expression: A
+                intervalMs: 1000
+                maxDataPoints: 43200
+                refId: C
+                type: threshold
+          dashboardUid: penpot-infrastructurev2
+          panelId: 3
+          noDataState: OK
+          execErrState: Error
+          for: 2m
+          annotations:
+            __dashboardUid__: penpot-infrastructurev2
+            __panelId__: "3"
+            description: Le worker node 2 en environnement staging ne répond plus. Impact possible sur la capacité de traitement.
+            summary: L'instance du worker node 2 est down !!!
+          labels:
+            environment: staging
+            node_type: worker
+            severity: warning
+          isPaused: false
+          notification_settings:
+            receiver: grafana-default-email

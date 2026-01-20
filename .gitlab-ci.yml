@@ -1,0 +1,18 @@
+# --- STAGES ---
+stages:
+  - lint
+  - staging
+  - production
+  - validate
+  - dryrun
+  - deploy
+  - destroy
+
+# --- DEFAULT ---
+default:
+  tags:
+    - penpot-runner
+
+include:
+  - local: .gitlab-ci/terraform.yml
+  - local: .gitlab-ci/ansible.yml

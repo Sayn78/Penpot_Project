@@ -1,0 +1,87 @@
+project_id   = "<YOUR_STAGING_PROJECT_ID>"
+region       = "europe-west9"
+network_name = "penpot-staging"
+
+subnet_private_name                  = "penpot-private-staging"
+subnet_private_cidr                  = "10.10.0.0/20"
+subnet_private_private_google_access = false
+
+subnet_public_name                  = "penpot-public-staging"
+subnet_public_cidr                  = "10.10.32.0/24"
+subnet_public_private_google_access = false
+
+subnet_db_name = "penpot-db-staging"
+subnet_db_cidr = "10.10.16.0/24"
+
+ssh_allowed_cidrs = [
+  "<YOUR_OFFICE_IP_CIDR/32>",
+]
+
+# core IP remote state (staging)
+core_ip_bucket = "penpot-staging"
+core_ip_prefix = "terraform/state/ip"
+use_staging_ips = true
+
+# Swarm manager (public)
+manager_zone         = "europe-west9-b"
+manager_machine_type = "e2-medium"
+manager_disk_size_gb = 30
+manager_image        = "projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64"
+# manager_service_account_email = "<optional-sa>@<project>.iam.gserviceaccount.com"
+
+# Workers (private) - worker1, worker2
+worker_machine_type = "e2-standard-4"
+worker_disk_size_gb = 80
+worker_image        = "projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64"
+workers = [
+  {
+    name                  = "penpot-worker1"
+    zone                  = "europe-west9-b"
+    service_account_email = ""
+  },
+  {
+    name                  = "penpot-worker2"
+    zone                  = "europe-west9-b"
+    service_account_email = ""
+  }
+]
+
+# Redis (staging)
+redis_name           = "penpot-redis-staging"
+redis_tier           = "BASIC"
+redis_memory_size_gb = 1
+redis_labels         = {}
+
+# Bastion (staging)
+bastion_zone         = "europe-west9-b"
+bastion_machine_type = "e2-micro"
+bastion_disk_size_gb = 20
+bastion_image        = "projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64"
+# bastion_service_account_email = "<optional-sa>@<project>.iam.gserviceaccount.com"
+
+# Monitoring (staging)
+monitoring_zone                 = "europe-west9-b"
+monitoring_machine_type         = "e2-medium"
+monitoring_disk_size_gb         = 50
+monitoring_image                = "projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64"
+# monitoring_service_account_email = "<optional-sa>@<project>.iam.gserviceaccount.com"
+
+# Cloud SQL (staging)
+cloudsql_instance_name     = "penpot-sql-staging"
+cloudsql_database_version  = "POSTGRES_15"
+cloudsql_tier              = "db-custom-2-8192"
+cloudsql_disk_size_gb      = 50
+cloudsql_availability_type = "ZONAL"
+cloudsql_username          = "penpot_app"
+cloudsql_password          = "<SET_IN_CI_OR_LOCALLY>"
+
+# Assets bucket (S3 AWS)
+assets_bucket_name          = "penpot-assets-staging"
+assets_bucket_versioning    = true
+assets_bucket_labels        = {}
+assets_bucket_force_destroy = true
+aws_region                  = "eu-west-3"
+
+# NAT
+nat_router_name = "penpot-staging-router"
+nat_name        = "penpot-staging-nat"

@@ -1,0 +1,54 @@
+# Prometheus configuration
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'penpot-{{ env | default("staging") }}'
+    environment: '{{ env | default("staging") }}'
+
+# Alerting configuration (optionnel)
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+# Rules (optionnel)
+rule_files:
+  # - "alerts.yml"
+
+# Scrape configurations
+scrape_configs:
+
+  # Node Exporter
+  - job_name: 'node-exporter'
+    static_configs:
+      # Manager VM
+      - targets: ['penpot-{{ env | default("staging") }}-manager:9100']
+        labels:
+          environment: '{{ env | default("staging") }}'
+          node_type: 'manager'
+          node_name: 'manager'
+
+      # Worker 1 VM
+      - targets: ['penpot-{{ env | default("staging") }}-worker1:9100']
+        labels:
+          environment: '{{ env | default("staging") }}'
+          node_type: 'worker'
+          node_name: 'worker1'
+
+      # Worker 2 VM
+      - targets: ['penpot-{{ env | default("staging") }}-worker2:9100']
+        labels:
+          environment: '{{ env | default("staging") }}'
+          node_type: 'worker'
+          node_name: 'worker2'
+
+  # Penpot Application - Métriques applicatives
+  - job_name: 'traefik'
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['penpot-{{ env | default("staging") }}-manager:8082']
+        labels:
+          environment: '{{ env | default("staging") }}'
+          service: 'traefik'
+          component: 'reverse-proxy'

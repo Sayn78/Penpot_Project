@@ -1,0 +1,117 @@
+---
+- name: Deploy Monitoring Agents via Docker Compose
+  hosts:
+    - "penpot-manager-{{ env | default('staging') }}"
+    - "penpot-worker1-{{ env | default('staging') }}"
+    - "penpot-worker2-{{ env | default('staging') }}"
+  become: true
+
+  vars:
+    agents_dir: /opt/monitoring-agents
+    loki_url: http://penpot-{{ env | default('staging') }}-monitoring:3100/loki/api/v1/push
+
+  pre_tasks:
+    - name: Créer le répertoire des agents
+      file:
+        path: "{{ agents_dir }}"
+        state: directory
+        mode: '0755'
+      tags: always
+
+    - name: Ajouter l'utilisateur au groupe systemd-journal (pour Promtail)
+      user:
+        name: root
+        groups: systemd-journal
+        append: yes
+      tags: always
+
+  tasks:
+    - name: Créer les dossiers de configuration
+      file:
+        path: "{{ agents_dir }}/{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - promtail/config
+      tags: deploy
+
+    - name: Copier docker-compose.yml
+      copy:
+        src: ../monitoring-agents/docker-compose.yml
+        dest: "{{ agents_dir }}/docker-compose.yml"
+        mode: '0644'
+      tags: deploy
+
+    - name: Copier la configuration Promtail
+      template:
+        src: ../monitoring-agents/promtail/config/promtail-config.yml.j2
+        dest: "{{ agents_dir }}/promtail/config/promtail-config.yml"
+        mode: '0644'
+      tags: deploy
+
+    - name: Créer le fichier .env avec le hostname
+      copy:
+        content: |
+          HOSTNAME={{ ansible_hostname }}
+        dest: "{{ agents_dir }}/.env"
+        mode: '0644'
+      tags: deploy
+
+    - name: Démarrer les agents de monitoring
+      command: docker compose up -d
+      args:
+        chdir: "{{ agents_dir }}"
+      tags: deploy
+
+    - name: Redemarrer les agents de monitoring
+      command: docker compose restart
+      args:
+        chdir: "{{ agents_dir }}"
+      tags: deploy
+
+    - name: Attendre que les services soient prêts
+      wait_for:
+        port: "{{ item }}"
+        timeout: 30
+      loop:
+        - 9100  # Node Exporter
+        - 9080  # Promtail
+      tags: verify
+
+  post_tasks:
+    - name: Vérifier Node Exporter
+      uri:
+        url: http://localhost:9100/metrics
+        method: GET
+        status_code: 200
+      register: node_exporter_check
+      until: node_exporter_check.status == 200
+      retries: 3
+      delay: 5
+      tags: verify
+
+    - name: Vérifier Promtail
+      uri:
+        url: http://localhost:9080/ready
+        method: GET
+        status_code: 200
+      register: promtail_check
+      until: promtail_check.status == 200
+      retries: 3
+      delay: 5
+      tags: verify
+
+    - name: Vérifier les logs Promtail (recherche d'erreurs)
+      shell: docker-compose logs promtail | grep -i "error\|failed" | tail -10
+      args:
+        chdir: "{{ agents_dir }}"
+      register: promtail_errors
+      changed_when: false
+      failed_when: false
+      tags: verify
+
+    - name: Afficher les erreurs Promtail (si présentes)
+      debug:
+        msg: "{{ promtail_errors.stdout_lines }}"
+      when: promtail_errors.stdout != ""
+      tags: verify

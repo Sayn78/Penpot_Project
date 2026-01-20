@@ -1,0 +1,53 @@
+apiVersion: 1
+
+templates:
+  - name: custom.firing_and_resolved_alerts
+    template: |
+      {{ define "custom.firing_and_resolved_alerts" -}}
+      ═══════════════════════════════════════════════════════
+      GRAFANA ALERT NOTIFICATION - Funky Wombat Studio
+      ═══════════════════════════════════════════════════════
+
+      RÉSUMÉ
+      --------
+      Alertes résolues : {{ len .Alerts.Resolved }}
+      Alertes actives  : {{ len .Alerts.Firing }}
+
+      {{ if gt (len .Alerts.Resolved) 0 -}}
+      ═══════════════════════════════════════════════════════
+      ALERTES RÉSOLUES
+      ═══════════════════════════════════════════════════════
+
+      {{ range .Alerts.Resolved -}}
+      {{ template "alert.details" . -}}
+      {{ end -}}
+      {{ end -}}
+
+      {{ if gt (len .Alerts.Firing) 0 -}}
+      ═══════════════════════════════════════════════════════
+      ALERTES ACTIVES
+      ═══════════════════════════════════════════════════════
+
+      {{ range .Alerts.Firing -}}
+      {{ template "alert.details" . -}}
+      {{ end -}}
+      {{ end -}}
+
+      {{ if and (eq (len .Alerts.Resolved) 0) (eq (len .Alerts.Firing) 0) -}}
+      ═══════════════════════════════════════════════════════
+      ℹAucune alerte à signaler
+      ═══════════════════════════════════════════════════════
+      {{ end -}}
+
+      ---
+      Cet email a été généré automatiquement par Grafana
+      {{ end -}}
+
+      {{ define "alert.details" -}}
+      ┌─────────────────────────────────────────────────────┐
+      │ {{ .Annotations.summary }}
+      │ Statut : {{ .Status }}
+      │ {{ .Annotations.description }}
+      └─────────────────────────────────────────────────────┘
+
+      {{ end -}}

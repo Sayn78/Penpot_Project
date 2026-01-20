@@ -1,0 +1,72 @@
+---
+- name: Sécurisation du bastion
+  hosts: "bastion-{{ env | default('staging') }}"
+  become: true
+  vars:
+    sshd_file: /etc/ssh/sshd_config
+
+  tasks:
+
+    - name: MAJ des paquets
+      apt:
+        update_cache: yes
+
+    # NOTE: Port 22 conservé pour l'instant (rotation/connexion plus simple).
+    # Pour durcir plus tard : remonter sur 4222 via un drop-in.
+
+    - name: Désactiver le login root
+      lineinfile:
+        path: "{{ sshd_file }}"
+        regexp: '^PermitRootLogin'
+        line: 'PermitRootLogin no'
+      notify: restart ssh
+
+    - name: Désactiver l'authentification par mot de passe
+      lineinfile:
+        path: "{{ sshd_file }}"
+        regexp: '^PasswordAuthentication'
+        line: 'PasswordAuthentication no'
+      notify: restart ssh
+
+    - name: Installer fail2ban
+      apt:
+        name: fail2ban
+        state: present
+        update_cache: yes
+
+    - name: Configurer fail2ban pour SSH sur le port 22
+      copy:
+        dest: /etc/fail2ban/jail.d/sshd.local
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          [sshd]
+          enabled = true
+          port    = 22
+          filter  = sshd
+          logpath = /var/log/auth.log
+          maxretry = 5
+          bantime  = 600
+          findtime = 600
+      notify: restart fail2ban
+
+    - name: S'assurer que fail2ban est activé et démarré
+      service:
+        name: fail2ban
+        state: started
+        enabled: yes
+      when: not ansible_check_mode # éviter de démarrer en check mode
+
+  handlers:
+    # Utilisation du restart pour anticiper le changement de port SSH plus tard
+    - name: restart ssh
+      service:
+        name: ssh
+        state: restarted
+
+    - name: restart fail2ban
+      service:
+        name: fail2ban
+        state: restarted
+      when: not ansible_check_mode # éviter de démarrer en check mode

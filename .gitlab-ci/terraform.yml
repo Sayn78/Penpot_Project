@@ -1,0 +1,169 @@
+---
+# --- BASE - TERRAFORM ---
+.terraform_base:
+  image: &tf_image
+    name: hashicorp/terraform:1.14
+    entrypoint: [""]
+  before_script:
+    - echo "$GCP_TERRAFORM_SA_KEY_B64" | base64 -d > /tmp/gcp-key.json
+    - chmod 600 /tmp/gcp-key.json
+    - export GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-key.json
+    - cd terraform/gcp && terraform init -backend=false
+  after_script:
+    - rm -f /tmp/gcp-key.json
+
+# --- TEMPLATES - TERRAFORM ACTIONS ---
+.terraform_init:
+  extends: .terraform_base
+  needs:
+    - terraform-check
+  variables:
+    TF_ENV: "staging" # default
+  artifacts:
+    paths:
+      - terraform/gcp/.terraform
+      - terraform/gcp/.terraform.lock.hcl
+    expire_in: 1h
+  script:
+    - terraform init -backend-config=environments/$TF_ENV/backend.hcl -input=false -reconfigure
+  allow_failure: false
+
+.terraform_plan:
+  extends: .terraform_base
+  variables:
+    TF_ENV: "staging" # default
+    TF_VARS_FILE: "environments/$TF_ENV/terraform.tfvars" # default
+  artifacts:
+    paths:
+      - terraform/gcp/tfplan
+    expire_in: 1h
+  script:
+    - terraform plan -out=tfplan -input=false -var-file="$TF_VARS_FILE"
+  allow_failure: false
+
+.terraform_apply:
+  extends: .terraform_base
+  variables:
+    TF_ENV: "staging" # default
+  script:
+    - terraform apply -input=false -auto-approve tfplan
+  allow_failure: false
+
+.terraform_destroy:
+  extends: .terraform_base
+  variables:
+    TF_ENV: "staging" # default
+    TF_VARS_FILE: ""
+  script:
+    - terraform init -backend-config=environments/$TF_ENV/backend.hcl -input=false -reconfigure
+    - terraform destroy -input=false -auto-approve -var-file="$TF_VARS_FILE"
+  allow_failure: false
+
+# --- JOBS ---
+terraform-check:
+  stage: lint
+  extends: .terraform_base
+  before_script:
+    - cd terraform/gcp
+    - rm -rf .terraform
+    - terraform init -backend=false -reconfigure
+  script:
+    - terraform fmt -recursive -check
+    - terraform validate
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "staging" || $CI_COMMIT_BRANCH == "main"'
+      when: on_success
+    - when: never
+
+# --- STAGING ---
+terraform-init-staging:
+  extends: .terraform_init
+  stage: staging
+  needs:
+    - terraform-check
+  variables:
+    TF_ENV: "staging"
+  only:
+    - staging
+
+terraform-plan-staging:
+  extends: .terraform_plan
+  stage: staging
+  needs:
+    - terraform-init-staging
+  only:
+    - staging
+  variables:
+    TF_ENV: "staging"
+    TF_VARS_FILE: "$TFVARS_STAGING"
+
+terraform-apply-staging:
+  extends: .terraform_apply
+  stage: staging
+  environment: staging
+  only:
+    - staging
+  needs:
+    - job: terraform-plan-staging
+      artifacts: true
+  variables:
+    TF_ENV: "staging"
+
+# --- PRODUCTION ---
+terraform-init-prod:
+  extends: .terraform_init
+  stage: production
+  needs:
+    - terraform-check
+  only:
+    - main
+  variables:
+    TF_ENV: "prod"
+
+terraform-plan-prod:
+  extends: .terraform_plan
+  stage: production
+  needs:
+    - terraform-init-prod
+  only:
+    - main
+  variables:
+    TF_ENV: "prod"
+    TF_VARS_FILE: "$TFVARS_PROD"
+
+terraform-apply-prod:
+  extends: .terraform_apply
+  stage: production
+  environment: production
+  when: manual
+  only:
+    - main
+  needs:
+    - job: terraform-plan-prod
+      artifacts: true
+  variables:
+    TF_ENV: "prod"
+
+# --- DESTROY STAGING ---
+terraform-destroy-staging:
+  extends: .terraform_destroy
+  stage: destroy
+  environment: staging
+  when: manual
+  only:
+    - staging
+  variables:
+    TF_ENV: "staging"
+    TF_VARS_FILE: "$TFVARS_STAGING"
+
+# --- DESTROY PRODUCTION ---
+terraform-destroy-prod:
+  extends: .terraform_destroy
+  stage: destroy
+  environment: production
+  when: manual
+  only:
+    - main
+  variables:
+    TF_ENV: "prod"
+    TF_VARS_FILE: "$TFVARS_PROD"

@@ -1,0 +1,39 @@
+---
+- name: Générer le .env Penpot sur le manager (secrets via GCP SM)
+  hosts: "penpot-manager-{{ env | default('staging') }}"
+  become: true
+
+  pre_tasks:
+    - name: Charger les outputs Terraform depuis le fichier local
+      set_fact:
+        tf: "{{ lookup('file', playbook_dir + '/../terraform-outputs-' + (env | default('staging')) + '.json') | from_json }}"
+      delegate_to: localhost
+      run_once: true
+      check_mode: no
+      failed_when: tf is not defined
+
+    - name: Surcharger les variables Penpot depuis les outputs chargés
+      set_fact:
+        penpot_database_name: "{{ tf.cloudsql_database_name.value | default(penpot_database_name, true) }}"
+        penpot_database_uri: "{{ ('postgresql://' + tf.cloudsql_private_ip.value + ':5432/' + penpot_database_name) | default(penpot_database_uri, true) }}"
+        penpot_redis_uri: "{{ ('redis://' + tf.redis_host.value + ':' + (tf.redis_port.value | string)) | default(penpot_redis_uri, true) }}"
+        penpot_public_uri: "{{ penpot_public_uri | default(penpot_public_uri, true) }}"
+        penpot_objects_s3_bucket: "{{ tf.assets_bucket_name.value | default(penpot_objects_s3_bucket, true) }}"
+        penpot_objects_s3_region: "{{ tf.assets_bucket_region.value | default(penpot_objects_s3_region, true) }}"
+      run_once: true
+
+  tasks:
+    - name: Créer le répertoire Penpot
+      file:
+        path: /opt/penpot
+        state: directory
+        mode: "0755"
+
+    - name: Rendre le fichier .env depuis les secrets
+      template:
+        src: ../templates/penpot.env.j2
+        dest: /opt/penpot/.env
+        owner: root
+        group: root
+        mode: "0600"
+      no_log: true

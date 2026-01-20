@@ -1,0 +1,56 @@
+---
+# Domaine et URI publics
+penpot_domain: "app.pen-pot.com"
+penpot_public_uri: "https://{{ penpot_domain }}"
+# Domaine Grafana
+grafana_domain: "grafana.pen-pot.com"
+
+# Valeurs issues des outputs Terraform (à renseigner depuis terraform output/remote state)
+penpot_database_uri: "postgresql://<TF_CLOUDSQL_IP>:5432/<TF_DB_NAME>"
+penpot_database_name: "penpot"
+penpot_redis_uri: "redis://<TF_REDIS_IP>:6379"
+
+# Projet GCP (utile pour les lookups Secret Manager)
+penpot_gcp_project: "penpot-480214"
+
+# Flags et tailles
+penpot_flags: "enable-email-verification enable-smtp enable-prepl-server enable-secure-session-cookies enable-login-with-google"
+penpot_http_body_size: 31457280
+penpot_http_multipart_size: 367001600
+
+# Télémetrie
+penpot_telemetry_enabled: true
+penpot_telemetry_referer: compose
+
+# Replicas (Swarm)
+penpot_frontend_replicas: 2
+penpot_backend_replicas: 2
+penpot_exporter_replicas: 2
+
+# SMTP (adapter si secrets nécessaires pour user/pass)
+penpot_smtp_default_from: "no-reply@pen-pot.com"
+penpot_smtp_default_reply_to: "no-reply@pen-pot.com"
+penpot_smtp_port: 587
+penpot_smtp_tls: true
+penpot_smtp_ssl: false
+
+# Stockage S3 (endpoint implicite pour AWS S3)
+penpot_objects_backend: "s3"
+penpot_objects_s3_bucket: "<BUCKET_FROM_TERRAFORM_OUTPUT>"
+penpot_objects_s3_region: "<REGION_FROM_TERRAFORM_OUTPUT>"
+
+# IDs complets des secrets dans GCP Secret Manager (versions latest) pour PROD
+penpot_secret_ids:
+  db_user: "PENPOT_DB_USER_PROD"
+  db_password: "PENPOT_DB_PASSWORD_PROD"
+  secret_key: "PENPOT_SECRET_KEY_PROD"
+  aws_access_key_id: "PENPOT_AWS_ACCESS_KEY_ID_PROD"
+  aws_secret_access_key: "PENPOT_AWS_SECRET_ACCESS_KEY_PROD"
+  google_client_id: "PENPOT_GOOGLE_CLIENT_ID_PROD"
+  google_client_secret: "PENPOT_GOOGLE_CLIENT_SECRET_PROD"
+  smtp_host: "PENPOT_SMTP_HOST_PROD"
+  smtp_username: "PENPOT_SMTP_USERNAME_PROD"
+  smtp_password: "PENPOT_SMTP_PASSWORD_PROD"
+  grafana_password: "GF_SECURITY_ADMIN_PASSWORD_PROD"
+  gitlab_deploy_user: "PENPOT_GITLAB_DEPLOY_USER"
+  gitlab_deploy_token: "PENPOT_GITLAB_DEPLOY_TOKEN"

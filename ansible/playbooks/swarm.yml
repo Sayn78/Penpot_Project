@@ -1,0 +1,74 @@
+---
+- name: Init Swarm sur le manager
+  hosts: "penpot-manager-{{ env | default('staging') }}"
+  become: true
+
+  tasks:
+    # 1) Vérifier l'état Swarm actuel
+    - name: Récupérer l'état Swarm local (avant init)
+      command: >-
+        docker info --format '{{ "{{ .Swarm.LocalNodeState }} {{ .Swarm.ControlAvailable }}" }}'
+      register: swarm_status_before
+      failed_when: false      # ne fait pas échouer le play, même si docker n'est pas en swarm
+      changed_when: false
+
+    # 2) Initialiser Swarm si le nœud n'est pas manager
+    #    - inactive / false  -> pas dans un swarm -> on init
+    #    - active / true     -> déjà manager      -> on ne refait rien
+    #    - active / false    -> worker            -> cas anormal pour le manager
+    - name: Initialiser le cluster Swarm si nécessaire
+      command: docker swarm init --advertise-addr {{ ansible_default_ipv4.address }}
+      register: swarm_init
+      when: "'active true' not in swarm_status_before.stdout"
+      failed_when: swarm_init.rc != 0 and
+                   ('This node is already part of a swarm' not in swarm_init.stderr)
+      changed_when: swarm_init.rc == 0 and
+                    ('This node is already part of a swarm' not in swarm_init.stderr)
+
+    # 3) Relire l'état Swarm après init éventuel
+    - name: Récupérer l'état Swarm après init
+      command: >-
+        docker info --format '{{ "{{ .Swarm.LocalNodeState }} {{ .Swarm.ControlAvailable }}" }}'
+      register: swarm_status_after
+      failed_when: false
+      changed_when: false
+
+    # 4) Récupérer le token worker UNIQUEMENT si on est manager
+    - name: Récupérer le token worker (manager uniquement)
+      command: docker swarm join-token -q worker
+      register: swarm_worker_token
+      when: "'active true' in swarm_status_after.stdout"
+      failed_when: swarm_worker_token.rc != 0
+
+    # 5) Exposer le token aux workers via hostvars
+    - name: Stocker le token dans les hostvars (pour les workers)
+      set_fact:
+        worker_join_token: "{{ swarm_worker_token.stdout }}"
+      when:
+        - swarm_worker_token is defined
+        - swarm_worker_token.rc is defined
+        - swarm_worker_token.rc == 0
+
+
+- name: Joindre les workers au cluster Swarm
+  hosts:
+    - "penpot-worker1-{{ env | default('staging') }}"
+    - "penpot-worker2-{{ env | default('staging') }}"
+  become: true
+
+  tasks:
+    - name: Vérifier l'état Swarm local
+      command: >-
+        docker info --format '{{ "{{ .Swarm.LocalNodeState }}" }}'
+      register: swarm_status_worker
+      failed_when: false
+      changed_when: false
+
+    - name: Joindre le worker au Swarm (si pas déjà membre)
+      command: >
+        docker swarm join
+        --token {{ hostvars['penpot-manager-' ~ (env | default('staging'))].worker_join_token }}
+        {{ hostvars['penpot-manager-' ~ (env | default('staging'))].ansible_default_ipv4.address }}:2377
+      when:
+        - hostvars['penpot-manager-' ~ (env | default('staging'))].worker_join_token is defined
+        - swarm_status_worker.stdout != 'active'

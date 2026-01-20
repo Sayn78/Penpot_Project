@@ -1,0 +1,36 @@
+# Terraform state & lock files
+.terraform/
+*.tfstate*
+*.tfstate.*
+.terraform.lock.hcl
+
+# Terraform plans & variables
+*.tfplan
+*.tfvars
+*.tfvars.json
+
+# Terraform crash diagnostics
+crash.log
+
+# Ansible retry files
+*.retry
+
+# Ansible collections (installed locally)
+collections/
+ansible/collections/
+
+# Local service account key (do not commit)
+ansible-sa-key.json
+terraform-sa-key.json
+
+# Local terraform outputs for Ansible
+ansible/terraform-outputs-staging.json
+ansible/terraform-outputs-prod.json
+
+# Local logs & secrets
+*.log
+*.env
+
+# OS / IDE artifacts
+.DS_Store
+.idea/

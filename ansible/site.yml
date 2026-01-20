@@ -1,0 +1,8 @@
+---
+- import_playbook: playbooks/bastion_hardening.yml
+- import_playbook: playbooks/setup_docker.yml
+- import_playbook: playbooks/swarm.yml
+- import_playbook: playbooks/penpot_env.yml
+- import_playbook: playbooks/deploy_stack.yml
+- import_playbook: playbooks/setup_monitoring.yml
+- import_playbook: playbooks/setup_monitoring_agents.yml

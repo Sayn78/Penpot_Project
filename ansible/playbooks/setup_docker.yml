@@ -1,0 +1,135 @@
+---
+- name: Setup Manager + Workers + monitoring - MAJ système - installation Docker
+  hosts:
+    - "penpot-manager-{{ env | default('staging') }}"
+    - "penpot-worker1-{{ env | default('staging') }}"
+    - "penpot-worker2-{{ env | default('staging') }}"
+    - "monitoring-{{ env | default('staging') }}"
+  become: true
+
+  vars:
+    gitlab_deploy_user: "{{ lookup('google.cloud.gcp_secret_manager', key=penpot_secret_ids.gitlab_deploy_user, project=penpot_gcp_project, auth_kind='serviceaccount', service_account_file=lookup('env','GOOGLE_APPLICATION_CREDENTIALS')) }}"
+    gitlab_deploy_token: "{{ lookup('google.cloud.gcp_secret_manager', key=penpot_secret_ids.gitlab_deploy_token, project=penpot_gcp_project, auth_kind='serviceaccount', service_account_file=lookup('env','GOOGLE_APPLICATION_CREDENTIALS')) }}"
+
+  tasks:
+
+    # --- 0) Nettoyer les vieux dépôts Docker cassés (héritage des tests) ---
+    - name: Supprimer un éventuel dépôt Docker hérité des anciens tests
+      file:
+        path: /etc/apt/sources.list.d/docker.list
+        state: absent
+      ignore_errors: yes   # si le fichier n'existe pas, on s'en fiche
+
+    - name: Supprimer une ancienne clé GPG Docker potentiellement invalide
+      file:
+        path: /etc/apt/keyrings/docker.gpg
+        state: absent
+      ignore_errors: yes
+
+    # --- 1) Core system update ---
+    - name: MAJ du système (apt update)
+      apt:
+        update_cache: yes
+
+    # --- 2) Prérequis pour le script Docker ---
+    - name: Installation des prérequis (curl, ca-certificates)
+      apt:
+        name:
+          - ca-certificates
+          - curl
+        state: present
+
+    # --- 3) Check Docker déjà installé avant ---
+    - name: Vérifier si Docker est déjà installé
+      stat:
+        path: /usr/bin/docker
+      register: docker_bin_before
+
+    # --- 4) Install Docker via official script if absent ---
+    - name: Installer Docker via script officiel si absent
+      shell: |
+        curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
+        sh /tmp/get-docker.sh
+      args:
+        executable: /bin/bash
+      when: not docker_bin_before.stat.exists
+
+    # --- 5) Re-check après installation éventuelle ---
+    - name: Vérifier Docker après installation
+      stat:
+        path: /usr/bin/docker
+      register: docker_bin_after
+
+    # --- 6) Service systemd Docker ---
+    - name: Activation et démarrage du service Docker
+      service:
+        name: docker
+        state: started   # ensure running
+        enabled: yes     # enable au boot
+      when:
+        - docker_bin_after.stat.exists
+        - not ansible_check_mode
+
+    # --- 7) Droits user pour utiliser docker sans sudo ---
+    - name: Ajout de l'utilisateur OS Login au groupe docker
+      user:
+        name: "{{ ansible_user }}"  # user Ansible/OS Login
+        groups: docker
+        append: yes                 # ne pas écraser ses autres groupes
+      when:
+        - docker_bin_after.stat.exists
+        - not ansible_check_mode
+
+    # --- 8) Login au registre GitLab pour Docker ---
+    - name: Login Docker au registre GitLab (manager uniquement)
+      docker_login:
+        registry_url: registry.gitlab.com
+        username: "{{ gitlab_deploy_user }}"
+        password: "{{ gitlab_deploy_token }}"
+        reauthorize: true
+      when:
+        - inventory_hostname.startswith('penpot-manager-')
+
+    - name: Créer le fichier d'env pour le login registry au boot (manager uniquement)
+      copy:
+        dest: /etc/docker/registry-auth.env
+        content: |
+          REGISTRY_URL=registry.gitlab.com
+          REGISTRY_USER={{ gitlab_deploy_user }}
+          REGISTRY_PASSWORD={{ gitlab_deploy_token }}
+        owner: root
+        group: root
+        mode: "0600"
+      when:
+        - inventory_hostname.startswith('penpot-manager-')
+
+    - name: Installer le service systemd de login registry (manager uniquement)
+      copy:
+        dest: /etc/systemd/system/docker-registry-login.service
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=Login au registre GitLab pour Docker
+          After=docker.service network-online.target
+          Wants=network-online.target
+
+          [Service]
+          Type=oneshot
+          EnvironmentFile=/etc/docker/registry-auth.env
+          ExecStart=/usr/bin/env bash -c "/usr/bin/echo \"${REGISTRY_PASSWORD}\" | /usr/bin/docker login ${REGISTRY_URL} -u \"${REGISTRY_USER}\" --password-stdin"
+          RemainAfterExit=yes
+
+          [Install]
+          WantedBy=multi-user.target
+      when:
+        - inventory_hostname.startswith('penpot-manager-')
+
+    - name: Activer et lancer le service de login registry (manager uniquement)
+      systemd:
+        name: docker-registry-login.service
+        daemon_reload: yes
+        enabled: yes
+        state: started
+      when:
+        - inventory_hostname.startswith('penpot-manager-')
+        - not ansible_check_mode

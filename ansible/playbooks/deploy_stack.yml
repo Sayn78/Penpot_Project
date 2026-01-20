@@ -1,0 +1,28 @@
+---
+- name: Déployer la stack Penpot (Docker Swarm)
+  hosts: "penpot-manager-{{ env | default('staging') }}"
+  become: true
+
+  vars:
+    penpot_remote_dir: /opt/penpot
+    penpot_stack_template: "{{ playbook_dir }}/../templates/docker-compose.yaml.j2"
+    penpot_stack_dest: /opt/penpot/penpot-stack.yml
+
+  tasks:
+    - name: Assurer l'existence du répertoire Penpot
+      file:
+        path: "{{ penpot_remote_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Rendre le stack Swarm Penpot depuis le template
+      template:
+        src: "{{ penpot_stack_template }}"
+        dest: "{{ penpot_stack_dest }}"
+        mode: "0644"
+
+    - name: Déployer la stack Penpot (docker stack deploy)
+      command: docker stack deploy --with-registry-auth -c penpot-stack.yml penpot
+      args:
+        chdir: "{{ penpot_remote_dir }}"
+      when: not ansible_check_mode

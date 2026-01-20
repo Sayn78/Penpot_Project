@@ -1,0 +1,12 @@
+apiVersion: 1
+contactPoints:
+  - orgId: 1
+    name: grafana-default-email
+    receivers:
+      - uid: ef75szeecpiwwb
+        type: email
+        settings:
+          addresses: admin@pen-pot.com
+          message: '{{ template "custom.firing_and_resolved_alerts" . }}'
+          singleEmail: false
+        disableResolveMessage: false

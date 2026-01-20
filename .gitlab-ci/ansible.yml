@@ -1,0 +1,166 @@
+---
+# --- VARIABLES ---
+variables:
+  ENV: "staging"
+  GIT_STRATEGY: fetch
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  ANSIBLE_FORCE_COLOR: "true"
+  PY_COLORS: "1"
+  CLOUDSDK_CORE_DISABLE_PROMPTS: "1"
+  TF_IN_AUTOMATION: "1"
+  TERRAFORM_VERSION: "1.14.2"
+
+cache:
+  key: "${CI_COMMIT_REF_SLUG}"
+  paths:
+    - .cache/pip
+    - ansible/collections
+    - .venv
+
+.default_ansible:
+  image: google/cloud-sdk:slim
+  before_script:
+    - apt-get update
+    - apt-get install -y --no-install-recommends
+      python3 python3-venv python3-pip
+      openssh-client ca-certificates git curl unzip
+    - chmod -R go-w "$CI_PROJECT_DIR" || true
+    - chmod -R go-w "$CI_PROJECT_DIR/ansible" || true
+
+    # Terraform (uniquement pour lire le state + outputs)
+    - curl -fsSL "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip" -o /tmp/terraform.zip
+    - unzip -o /tmp/terraform.zip -d /usr/local/bin
+    - terraform -version
+
+    # Python venv + Ansible
+    - python3 -m venv "$CI_PROJECT_DIR/.venv"
+    - . "$CI_PROJECT_DIR/.venv/bin/activate"
+    - pip install --upgrade pip setuptools wheel
+    - pip install "ansible-core>=2.17,<2.18" requests google-auth
+
+    # Auth GCP
+    - echo "$GCP_ANSIBLE_SA_KEY_B64" | base64 -d > /tmp/gcp-sa.json
+    - chmod 600 /tmp/gcp-sa.json
+    - export GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-sa.json
+    - gcloud auth activate-service-account --key-file=/tmp/gcp-sa.json
+    - gcloud config set project "$GCP_PROJECT_ID"
+
+    # OS Login + agent
+    - mkdir -p "$HOME/.ssh" && chmod 700 "$HOME/.ssh"
+    - ssh-keygen -t ed25519 -N "" -f "$HOME/.ssh/ci_oslogin_ed25519"
+    - eval "$(ssh-agent -s)"
+    - ssh-add "$HOME/.ssh/ci_oslogin_ed25519"
+    - |
+      # Ajout clé OS Login avec retries (silence la sortie)
+      for i in 1 2 3; do
+        if gcloud compute os-login ssh-keys add --key-file "$HOME/.ssh/ci_oslogin_ed25519.pub" --ttl=1h --project="$GCP_PROJECT_ID" >/dev/null; then
+          break
+        fi
+        echo "Retry add OS Login key ($i/3)..."
+        sleep 5
+      done
+
+    # Ansible deps
+    - cd ansible
+    - ansible-galaxy collection install -r requirements.yml -p collections
+
+  after_script:
+    - |
+      if [ -f "$HOME/.ssh/ci_oslogin_ed25519.pub" ]; then
+        gcloud compute os-login ssh-keys remove --key-file "$HOME/.ssh/ci_oslogin_ed25519.pub" --project="$GCP_PROJECT_ID" >/dev/null 2>&1 || true
+      fi
+      rm -f "$CI_PROJECT_DIR/ansible/terraform-outputs-${ENV}.json" || true
+
+# ----------------------
+# Validate (syntax only)
+# ----------------------
+validate:ansible:
+  extends: .default_ansible
+  stage: validate
+  script:
+    - ansible-playbook -i inventory.ini site.yml -e env="$ENV" --syntax-check
+  rules:
+    # MR : env suit la branche cible
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "staging"'
+      variables: { ENV: "staging" }
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"'
+      variables: { ENV: "prod" }
+
+    # Push : branches d'env
+    - if: '$CI_COMMIT_BRANCH == "staging"'
+      variables: { ENV: "staging" }
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      variables: { ENV: "prod" }
+
+    # Push : toute autre branche => staging (tests)
+    - if: '$CI_COMMIT_BRANCH'
+      variables: { ENV: "staging" }
+
+    - when: never
+
+# ----------------------
+# Dry-run (check + diff)
+# ----------------------
+dryrun:ansible:
+  extends: .default_ansible
+  stage: dryrun
+  needs:
+    - job: terraform-apply-staging
+      optional: true
+    - job: terraform-apply-prod
+      optional: true
+  script:
+    - terraform -chdir="$CI_PROJECT_DIR/terraform/gcp" init -input=false -backend-config="environments/${ENV}/backend.hcl"
+    - terraform -chdir="$CI_PROJECT_DIR/terraform/gcp" output -json > "$CI_PROJECT_DIR/ansible/terraform-outputs-${ENV}.json"
+    - ansible-playbook -i inventory.ini ping.yml -e env="$ENV" --limit "$ENV"
+    - ansible-playbook -i inventory.ini site.yml -e env="$ENV" --limit "$ENV" --check
+  rules:
+    # Ne pas lancer sur les branches env (staging/main)
+    - if: '$CI_COMMIT_BRANCH == "staging"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: never
+
+    # MR : env suit la branche cible
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "staging"'
+      variables: { ENV: "staging" }
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"'
+      variables: { ENV: "prod" }
+
+    # Push : branches d'env
+    - if: '$CI_COMMIT_BRANCH == "staging"'
+      variables: { ENV: "staging" }
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      variables: { ENV: "prod" }
+
+    # Push : toute autre branche => staging
+    - if: '$CI_COMMIT_BRANCH'
+      variables: { ENV: "staging" }
+
+    - when: never
+
+# ----------------------
+# Deploy (apply réel)
+# ----------------------
+deploy:ansible:
+  extends: .default_ansible
+  stage: deploy
+  resource_group: "penpot-${ENV}"
+  needs:
+    - job: terraform-apply-staging
+      optional: true
+    - job: terraform-apply-prod
+      optional: true
+  script:
+    - terraform -chdir="$CI_PROJECT_DIR/terraform/gcp" init -input=false -backend-config="environments/${ENV}/backend.hcl"
+    - terraform -chdir="$CI_PROJECT_DIR/terraform/gcp" output -json > "$CI_PROJECT_DIR/ansible/terraform-outputs-${ENV}.json"
+    - ansible-playbook -i inventory.ini ping.yml -e env="$ENV" --limit "$ENV"
+    - ansible-playbook -i inventory.ini site.yml -e env="$ENV" --limit "$ENV"
+  rules:
+    # uniquement sur branches d'env
+    - if: '$CI_COMMIT_BRANCH == "staging"'
+      variables: { ENV: "staging" }
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      variables: { ENV: "prod" }
+      when: manual
+    - when: never
